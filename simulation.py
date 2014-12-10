@@ -27,26 +27,21 @@ class Configuration(object):
         with open(filename) as f:
             data = f.read()
 
-        numbers = [float(row.split()[0]) for row in data.split('\n')[:13]]
+        numbers = [float(row.split()[0]) for row in data.split('\n')[:9]]
+        self.delta_tau = numbers[0]
+        self.N = numbers[1]
+        self.kappa = numbers[2]
+        self.omega = numbers[3]
+        self.n = numbers[4]
 
-        self.n = int(numbers[0])
-        self.m = numbers[1]
-        self.epsilon = numbers[2]
-        self.R = numbers[3]
-
-        self.f = numbers[4]
-        self.L = numbers[5]
-        self.a = numbers[6]
-
-        self.To = numbers[7]
-        self.tau = numbers[8]
-        self.s_o = int(numbers[9])
-        self.s_d = int(numbers[10])
-        self.s_out = int(numbers[11])
-        self.s_xyz = int(numbers[12])
+        self.s_o = int(numbers[5])
+        self.s_d = int(numbers[6])
+        self.s_out = int(numbers[7])
+        self.s_xyz = int(numbers[8])
+        self.tau = 0
 
     def __str__(self):
-        return "To_%s_tau_%s_n_%s" % (self.To, self.tau, self.n)
+        return "n_%s_kappa_%s_w_%s" % (self.n, self.kappa, self.omega)
 
 
 class Reporter(object):
@@ -71,11 +66,11 @@ class Simulation(object):
 
         self.epsilon = 0
 
-        potential_output = self.prepare_output_path(output_filename, 'potential')
-        potential_reporter = Reporter(potential_output)
+        epsilon_output = self.prepare_output_path(output_filename, 'epsilon')
+        epsilon_reporter = Reporter(epsilon_output)
 
         self.reporters_to_params = (
-            (potential_reporter, lambda: self.epsilon),
+            (epsilon_reporter, lambda: self.epsilon),
         )
 
     def prepare_output_path(self, output_filename, param_name):
