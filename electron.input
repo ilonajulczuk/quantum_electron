@@ -1,9 +1,9 @@
 0.0001  # dt
-1000 # n_steps
+100 # discretization of X
 0 # kappa
 0 # omega
 1 # n
-100 # s_o 
+10 # s_o
 1000 # s_d
-100 # s_out
+10 # s_out
 10  # s_xyz

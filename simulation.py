@@ -29,7 +29,7 @@ class Configuration(object):
 
         numbers = [float(row.split()[0]) for row in data.split('\n')[:9]]
         self.delta_tau = numbers[0]
-        self.N = numbers[1]
+        self.N = int(numbers[1])
         self.kappa = numbers[2]
         self.omega = numbers[3]
         self.n = numbers[4]
@@ -65,6 +65,17 @@ class Simulation(object):
         self.conf = Configuration(configuration_file)
 
         self.epsilon = 0
+        self.tau = 0
+
+        self.xs = np.linspace(0, 1, self.conf.N)
+
+        self.delta_x = self.xs[1] - self.xs[0]
+
+        self.psi_real = np.sqrt(2) * np.sin(np.pi * self.conf.n * self.xs)
+        self.psi_imaginary = np.zeros((self.conf.N))
+        self.H_r = self.compute_H_r(self.psi_real)
+        self.H_i = self.compute_H_i(self.psi_imaginary)
+
 
         epsilon_output = self.prepare_output_path(output_filename, 'epsilon')
         epsilon_reporter = Reporter(epsilon_output)
@@ -79,7 +90,35 @@ class Simulation(object):
         return dirs + '/' + param_name + '_' + str(self.conf) + filename
 
     def step(self):
-        pass
+        self.tau += self.conf.delta_tau
+        psi_real_half = self.psi_real + self.H_i * self.conf.delta_tau / 2
+        self.H_r = self.compute_H_r(psi_real_half)
+        self.psi_imaginary = self.psi_imaginary - self.H_r * self.conf.delta_tau
+
+        self.H_i = self.compute_H_i(self.psi_imaginary)
+        self.psi_real = psi_real_half + self.H_i * self.conf.delta_tau / 2
+        return self.psi_real, self.psi_imaginary
+
+    def compute_system_parameters(self):
+        self.N = self.delta_x * (np.dot(self.psi_imaginary, self.psi_imaginary) + np.dot(self.psi_real, self.psi_real))
+        self.x = self.delta_x * np.dot(self.xs, (np.power(self.psi_imaginary, 2) + np.power(self.psi_real, 2)))
+
+        self.epsilon = self.delta_x * (np.dot(self.psi_imaginary, self.H_i) + np.dot(self.psi_real, self.H_r))
+        self.ro = np.dot(self.psi_imaginary, self.psi_imaginary) + np.dot(self.psi_real, self.psi_real)
+
+    def compute_H_r(self, psi_real):
+        H_r = np.zeros(self.conf.N)
+        H_r[1:-1] = (0.5 * (psi_real[1:-1] * 2 - psi_real[:-2] - psi_real[2:]) /
+                     self.delta_x ** 2 + self.conf.kappa * psi_real[1:-1] *
+                     np.sin(self.conf.omega * self.tau))
+        return H_r
+
+    def compute_H_i(self, psi_imaginary):
+        H_i = np.zeros(self.conf.N)
+        H_i[1:-1] = (0.5 * (psi_imaginary[1:-1] * 2 - psi_imaginary[:-2] - psi_imaginary[2:]) /
+                     self.delta_x ** 2 + self.conf.kappa * psi_imaginary[1:-1] *
+                     np.sin(self.conf.omega * self.tau))
+        return H_i
 
     def run(self, s_o=None, s_d=None, s_out=None, s_xyz=None):
         if s_o is None:
@@ -100,8 +139,7 @@ class Simulation(object):
             if j % s_xyz == 0:
                 pass
             if j % s_out == 0:
-                pass
-            if j % s_o == 0:
+                self.compute_system_parameters()
                 for reporter, param in self.reporters_to_params:
                     reporter.store([[j * self.conf.tau, param()]])
 
