@@ -1,0 +1,9 @@
+0.0001  # dt
+100 # discretization of X
+3 # kappa
+39.47 # omega
+1 # n
+1 # s_o
+20000 # s_d
+20 # s_out
+20  # s_xyz

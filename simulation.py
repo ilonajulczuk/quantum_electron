@@ -1,6 +1,4 @@
 from __future__ import division
-from math import sqrt, log
-from random import random, choice
 import sys
 
 import numpy as np
@@ -8,18 +6,28 @@ import numpy as np
 
 def save_to_file(results, filename):
     with open(filename, 'w+') as f:
-        template = "{}\t" * len(results[0]) + "\n"
-        for x in results:
-            f.write(template.format(*list(x)))
+        try:
+            template = "{}\t" * len(results[0]) + "\n"
+            for x in results:
+                f.write(template.format(*list(x)))
+        except TypeError:
+            template = "{}\t\n"
+            for x in results:
+                f.write(template.format(x))
 
 
 def append_to_file(results, filename, blank_lines=False):
     with open(filename, 'a+') as f:
         if blank_lines:
             f.write('\n\n')
-        template = "{}\t" * len(results[0]) + "\n"
-        for x in results:
-            f.write(template.format(*list(x)))
+        try:
+            template = "{}\t" * len(results[0]) + "\n"
+            for x in results:
+                f.write(template.format(*list(x)))
+        except TypeError:
+            template = "{}\t\n"
+            for x in results:
+                f.write(template.format(x))
 
 
 class Configuration(object):
@@ -72,17 +80,25 @@ class Simulation(object):
         self.delta_x = self.xs[1] - self.xs[0]
 
         self.psi_real = np.sqrt(2) * np.sin(np.pi * self.conf.n * self.xs)
-        self.psi_imaginary = np.zeros((self.conf.N))
+        self.psi_imaginary = np.zeros(self.conf.N)
         self.H_r = self.compute_H_r(self.psi_real)
         self.H_i = self.compute_H_i(self.psi_imaginary)
 
+        self.reporters_to_params = []
+        self.psi_real_reporter = Reporter(self.prepare_output_path(output_filename, 'psi_real'),
+                                          blank_lines=True)
+        self.psi_imaginary_reporter = Reporter(self.prepare_output_path(output_filename, 'psi_imaginary'),
+                                               blank_lines=True)
 
-        epsilon_output = self.prepare_output_path(output_filename, 'epsilon')
-        epsilon_reporter = Reporter(epsilon_output)
+        params = ['epsilon', 'ro', 'N', 'x']
 
-        self.reporters_to_params = (
-            (epsilon_reporter, lambda: self.epsilon),
-        )
+        for param in params:
+            output = self.prepare_output_path(output_filename, param)
+            reporter = Reporter(output)
+
+            self.reporters_to_params.append(
+                (reporter, lambda: getattr(self, param)),
+            )
 
     def prepare_output_path(self, output_filename, param_name):
         dirs = "/".join(output_filename.split('/')[:-1])
@@ -109,18 +125,19 @@ class Simulation(object):
     def compute_H_r(self, psi_real):
         H_r = np.zeros(self.conf.N)
         H_r[1:-1] = (0.5 * (psi_real[1:-1] * 2 - psi_real[:-2] - psi_real[2:]) /
-                     self.delta_x ** 2 + self.conf.kappa * psi_real[1:-1] *
+                     self.delta_x ** 2 + self.conf.kappa * self.xs[1:-1] * psi_real[1:-1] *
                      np.sin(self.conf.omega * self.tau))
         return H_r
 
     def compute_H_i(self, psi_imaginary):
         H_i = np.zeros(self.conf.N)
         H_i[1:-1] = (0.5 * (psi_imaginary[1:-1] * 2 - psi_imaginary[:-2] - psi_imaginary[2:]) /
-                     self.delta_x ** 2 + self.conf.kappa * psi_imaginary[1:-1] *
+                     self.delta_x ** 2 + self.conf.kappa * self.xs[1:-1] * psi_imaginary[1:-1] *
                      np.sin(self.conf.omega * self.tau))
         return H_i
 
     def run(self, s_o=None, s_d=None, s_out=None, s_xyz=None):
+        print('kappa', self.conf.kappa)
         if s_o is None:
             s_o = self.conf.s_o
         if s_d is None:
@@ -137,11 +154,12 @@ class Simulation(object):
             self.step()
 
             if j % s_xyz == 0:
-                pass
+                self.psi_real_reporter.store(self.psi_real)
+                self.psi_imaginary_reporter.store(self.psi_imaginary)
             if j % s_out == 0:
                 self.compute_system_parameters()
                 for reporter, param in self.reporters_to_params:
-                    reporter.store([[j * self.conf.tau, param()]])
+                    reporter.store([[j * self.tau, param()]])
 
 
 def main():

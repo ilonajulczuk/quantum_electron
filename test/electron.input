@@ -3,7 +3,7 @@
 0 # kappa
 0 # omega
 1 # n
-10 # s_o
-1000 # s_d
-10 # s_out
+1 # s_o
+200000 # s_d
+1 # s_out
 10  # s_xyz

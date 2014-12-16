@@ -1,0 +1,6 @@
+unset autoscale y
+set style function lines
+set yrange [-2:2]
+plot "kappa/psi_real_n_1.0_kappa_3.0_w_19.74output.dat" index iteration_count ls 1
+iteration_count=iteration_count+1
+if ((!limit_iterations) || (iteration_count<=limit_iterations)) reread
