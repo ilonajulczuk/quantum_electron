@@ -1,11 +1,11 @@
 from __future__ import division
 import sys
-
+import os
 import numpy as np
 
 
-def save_to_file(results, filename):
-    with open(filename, 'w+') as f:
+def save_to_file(results, filename, blank_lines=False):
+    with open(filename, 'a+') as f:
         try:
             template = "{}\t" * len(results[0]) + "\n"
             for x in results:
@@ -14,20 +14,8 @@ def save_to_file(results, filename):
             template = "{}\t\n"
             for x in results:
                 f.write(template.format(x))
-
-
-def append_to_file(results, filename, blank_lines=False):
-    with open(filename, 'a+') as f:
         if blank_lines:
             f.write('\n\n')
-        try:
-            template = "{}\t" * len(results[0]) + "\n"
-            for x in results:
-                f.write(template.format(*list(x)))
-        except TypeError:
-            template = "{}\t\n"
-            for x in results:
-                f.write(template.format(x))
 
 
 class Configuration(object):
@@ -54,18 +42,13 @@ class Configuration(object):
 
 class Reporter(object):
     def __init__(self, filename=None, blank_lines=False):
-
         self.output_filename = filename
-        self.output_file_created = False
-        self.results_output_file_created = False
         self.blank_lines = blank_lines
+        if os.path.exists(filename):
+            os.remove(filename)
 
     def store(self, results):
-        if not self.output_file_created:
-            save_to_file(results, self.output_filename)
-            self.output_file_created = True
-        else:
-            append_to_file(results, self.output_filename, self.blank_lines)
+        save_to_file(results, self.output_filename, self.blank_lines)
 
     def __str__(self):
         return 'Reporter %s' % self.output_filename
@@ -84,8 +67,8 @@ class Simulation(object):
 
         self.psi_real = np.sqrt(2) * np.sin(np.pi * self.conf.n * self.xs)
         self.psi_imaginary = np.zeros(self.conf.N)
-        self.H_r = self.compute_H_r(self.psi_real)
-        self.H_i = self.compute_H_i(self.psi_imaginary)
+        self.H_r = self.compute_hamiltionian(self.psi_real)
+        self.H_i = self.compute_hamiltionian(self.psi_imaginary)
         self.output_filename = output_filename
 
     def prepare_output_path(self, output_filename, param_name):
@@ -96,10 +79,10 @@ class Simulation(object):
     def step(self):
         self.tau += self.conf.delta_tau
         psi_real_half = self.psi_real + self.H_i * self.conf.delta_tau / 2
-        self.H_r = self.compute_H_r(psi_real_half)
+        self.H_r = self.compute_hamiltionian(psi_real_half)
         self.psi_imaginary = self.psi_imaginary - self.H_r * self.conf.delta_tau
 
-        self.H_i = self.compute_H_i(self.psi_imaginary)
+        self.H_i = self.compute_hamiltionian(self.psi_imaginary)
         self.psi_real = psi_real_half + self.H_i * self.conf.delta_tau / 2
         return self.psi_real, self.psi_imaginary
 
@@ -111,19 +94,12 @@ class Simulation(object):
         self.ro = np.dot(self.psi_imaginary, self.psi_imaginary) + np.dot(self.psi_real, self.psi_real)
         self.rox = self.psi_imaginary * self.psi_imaginary + self.psi_real * self.psi_real
 
-    def compute_H_r(self, psi_real):
-        H_r = np.zeros(self.conf.N)
-        H_r[1:-1] = (0.5 * (psi_real[1:-1] * 2 - psi_real[:-2] - psi_real[2:]) /
-                     self.delta_x ** 2 + self.conf.kappa * self.xs[1:-1] * psi_real[1:-1] *
-                     np.sin(self.conf.omega * self.tau))
-        return H_r
-
-    def compute_H_i(self, psi_imaginary):
-        H_i = np.zeros(self.conf.N)
-        H_i[1:-1] = (0.5 * (psi_imaginary[1:-1] * 2 - psi_imaginary[:-2] - psi_imaginary[2:]) /
-                     self.delta_x ** 2 + self.conf.kappa * self.xs[1:-1] * psi_imaginary[1:-1] *
-                     np.sin(self.conf.omega * self.tau))
-        return H_i
+    def compute_hamiltionian(self, psi):
+        hamiltionian = np.zeros(self.conf.N)
+        hamiltionian[1:-1] = (0.5 * (psi[1:-1] * 2 - psi[:-2] - psi[2:]) /
+                              self.delta_x ** 2 + self.conf.kappa * self.xs[1:-1] * psi[1:-1] *
+                              np.sin(self.conf.omega * self.tau))
+        return hamiltionian
 
     def run(self, s_o=None, s_d=None, s_out=None, s_xyz=None):
         output_filename = self.output_filename
@@ -174,9 +150,11 @@ def main():
     configuration_file = sys.argv[1]
     output_file = sys.argv[2]
 
-    rez = [0.90, 0.92, 0.94, 0.98, 1, 1.02, 1.04, 1.08, 1.10]
-    norm = [1]
-    for x in norm:
+    if len(sys.argv) == 4 and int(sys.argv[3]):
+        percents = [0.90, 0.92, 0.94, 0.98, 1, 1.02, 1.04, 1.08, 1.10]
+    else:
+        percents = [1]
+    for x in percents:
         prefix, _, suffix = output_file.rpartition('_')
         percent = str(x)
 

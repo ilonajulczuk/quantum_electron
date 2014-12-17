@@ -4,6 +4,6 @@
 15 # omega
 1 # n
 1 # s_o
-20000 # s_d
-1 # s_out
-10  # s_xyz
+200000 # s_d
+20 # s_out
+20  # s_xyz

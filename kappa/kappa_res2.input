@@ -4,6 +4,6 @@
 19.74 # omega
 1 # n
 1 # s_o
-20000 # s_d
-20 # s_out
-20  # s_xyz
+400000 # s_d
+40 # s_out
+40  # s_xyz
