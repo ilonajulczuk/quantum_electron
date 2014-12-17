@@ -67,6 +67,9 @@ class Reporter(object):
         else:
             append_to_file(results, self.output_filename, self.blank_lines)
 
+    def __str__(self):
+        return 'Reporter %s' % self.output_filename
+
 
 class Simulation(object):
     def __init__(self, configuration_file, output_filename=None):
@@ -83,22 +86,7 @@ class Simulation(object):
         self.psi_imaginary = np.zeros(self.conf.N)
         self.H_r = self.compute_H_r(self.psi_real)
         self.H_i = self.compute_H_i(self.psi_imaginary)
-
-        self.reporters_to_params = []
-        self.psi_real_reporter = Reporter(self.prepare_output_path(output_filename, 'psi_real'),
-                                          blank_lines=True)
-        self.psi_imaginary_reporter = Reporter(self.prepare_output_path(output_filename, 'psi_imaginary'),
-                                               blank_lines=True)
-
-        params = ['epsilon', 'ro', 'N', 'x']
-
-        for param in params:
-            output = self.prepare_output_path(output_filename, param)
-            reporter = Reporter(output)
-
-            self.reporters_to_params.append(
-                (reporter, lambda: getattr(self, param)),
-            )
+        self.output_filename = output_filename
 
     def prepare_output_path(self, output_filename, param_name):
         dirs = "/".join(output_filename.split('/')[:-1])
@@ -121,6 +109,7 @@ class Simulation(object):
 
         self.epsilon = self.delta_x * (np.dot(self.psi_imaginary, self.H_i) + np.dot(self.psi_real, self.H_r))
         self.ro = np.dot(self.psi_imaginary, self.psi_imaginary) + np.dot(self.psi_real, self.psi_real)
+        self.rox = self.psi_imaginary * self.psi_imaginary + self.psi_real * self.psi_real
 
     def compute_H_r(self, psi_real):
         H_r = np.zeros(self.conf.N)
@@ -137,7 +126,25 @@ class Simulation(object):
         return H_i
 
     def run(self, s_o=None, s_d=None, s_out=None, s_xyz=None):
-        print('kappa', self.conf.kappa)
+        output_filename = self.output_filename
+        self.reporters_to_params = []
+        self.psi_real_reporter = Reporter(self.prepare_output_path(output_filename, 'psi_real'),
+                                          blank_lines=True)
+        self.psi_imaginary_reporter = Reporter(self.prepare_output_path(output_filename, 'psi_imaginary'),
+                                               blank_lines=True)
+
+        self.rox_reporter = Reporter(self.prepare_output_path(output_filename, 'rox'),
+                                     blank_lines=True)
+        params = ['epsilon', 'ro', 'N', 'x']
+
+        for param in params:
+            output = self.prepare_output_path(output_filename, param)
+            reporter = Reporter(output)
+
+            self.reporters_to_params.append(
+                (reporter, param),
+            )
+
         if s_o is None:
             s_o = self.conf.s_o
         if s_d is None:
@@ -158,15 +165,25 @@ class Simulation(object):
                 self.psi_imaginary_reporter.store(self.psi_imaginary)
             if j % s_out == 0:
                 self.compute_system_parameters()
+                self.rox_reporter.store(self.rox)
                 for reporter, param in self.reporters_to_params:
-                    reporter.store([[j * self.tau, param()]])
+                    reporter.store([[self.tau, getattr(self, param)]])
 
 
 def main():
     configuration_file = sys.argv[1]
     output_file = sys.argv[2]
-    simulation = Simulation(configuration_file, output_file)
-    simulation.run()
+
+    rez = [0.90, 0.92, 0.94, 0.98, 1, 1.02, 1.04, 1.08, 1.10]
+    norm = [1]
+    for x in norm:
+        prefix, _, suffix = output_file.rpartition('_')
+        percent = str(x)
+
+        output_file_percent = prefix + percent + '_' + suffix
+        simulation = Simulation(configuration_file, output_file_percent)
+        simulation.conf.omega *= x
+        simulation.run()
 
 
 if __name__ == '__main__':
